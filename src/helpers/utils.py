@@ -161,11 +161,28 @@ class ShopifyExport:
         dim_df = self.create_parent_sku(dim_df)
         raw_df = self.create_parent_sku(raw_df)
         
-        result = pd.merge(
-            raw_df.drop(["Option1 Value"], axis=1).rename(columns={'SKU' : 'wholesaler_sku'}), dim_df, on=['parent_sku'],
-            how="left",indicator=True
-        ).rename(columns={'_merge' : 'source_data'})
+        
+        res1 = pd.merge(raw_df[raw_df['Option1 Value'].eq('SIZE F')].drop(["Option1 Value"], axis=1).rename(columns={'SKU' : 'wholesaler_sku'}),
+                        dim_df,
+                        how="left",
+                        on="parent_sku",
+                        indicator=True).rename(columns={'_merge' : 'source_data'})
+        
+        
+        res2 = pd.merge(raw_df[raw_df['Option1 Value'].ne('SIZE F')].drop(["Option1 Value"],axis=1),
+                        dim_df, how="left",
+                        on=["SKU",'parent_sku'],
+                        indicator=True).rename(columns={'_merge' : 'source_data'})
+         
+        
+        
+        # result = pd.merge(
+        #     raw_df.drop(["Option1 Value"], axis=1).rename(columns={'SKU' : 'wholesaler_sku'}), dim_df, on=['parent_sku'],
+        #     how="left",indicator=True
+        # ).rename(columns={'_merge' : 'source_data'})
 
+        result = pd.concat([res1,res2]).reset_index(drop=True)
+        
         result['source_data'] = np.where(result['source_data'] == 'both', 'both', 'missing')
         
         output_columns.append('source_data')
