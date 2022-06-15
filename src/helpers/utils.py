@@ -1,12 +1,39 @@
-from dataclasses import dataclass
-from typing import Optional
+import json
 import logging
+import os
+from dataclasses import dataclass
 from pathlib import Path
 from gspread_pandas import Spread
 from gspread_pandas.conf import get_config
+from typing import Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from gspread_pandas import  conf, Spread
+
+
+creds = [
+    "type" "project_id",
+    "private_key_id",
+    "private_key",
+    "client_email",
+    "client_id",
+    "auth_uri",
+    "token_uri",
+    "auth_provider_x509_cert_url",
+    "client_x509_cert_url",
+]
+
+cred_dict = {}
+for c in creds:
+    cred_dict[c] = os.environ.get(c)
+
+
+with open('google_secret.json', 'w') as f:
+    json.dump(cred_dict, f)
+
+c = conf.get_config(".", "google_secret.json")
+
 
 p = Path(__file__).parent.parent.joinpath("logs")
 logger = logging.getLogger(__name__)
@@ -78,13 +105,14 @@ class ShopifyExport:
         """
 
         # open sheet
-        df = self.service.sheet_to_df(sheet=sheet_name).reset_index().replace('', np.nan)
+        df = (
+            self.service.sheet_to_df(sheet=sheet_name).reset_index().replace("", np.nan)
+        )
         # log start
         start_time = self.generate_time()
         self.post_log(f"Started transform_raw_export for {sheet_name}", start_time)
 
         df1 = df[df["SIZE F"].isnull()]
-
 
         accessories = (
             df.dropna(subset=["SIZE F"])
@@ -118,21 +146,22 @@ class ShopifyExport:
 
         self.post_log(f"Finished transform_raw_export for {sheet_name}", start_time)
 
-        final = pd.concat([size_df_melted.drop('wholesaler_sku',axis=1), accessories]).reset_index(drop=True)
-        
+        final = pd.concat(
+            [size_df_melted.drop("wholesaler_sku", axis=1), accessories]
+        ).reset_index(drop=True)
+
         return final
-    
-    
-    def create_parent_sku(self, dataframe : pd.DataFrame) -> pd.DataFrame:
-        
-        """creates a parent sku by stripping out anything in parenthesis 
+
+    def create_parent_sku(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+
+        """creates a parent sku by stripping out anything in parenthesis
            and removes the dash from the end of the sku
-           
+
            in addition it upper cases the sku
-           
+
         usage:
             df = create_parent_sku(df)
-            
+
         example:
             'CA013-XS' -> 'CA013'
             'CA013(CLEANRANCE)' -> 'CA013'
@@ -141,11 +170,11 @@ class ShopifyExport:
         Returns:
             dataframe with parent sku column
         """
-        dataframe['SKU'] = dataframe['SKU'].str.upper().str.strip()
-        
-        dataframe['parent_sku'] = dataframe['SKU'].str.replace("\(.*\)", "", regex=True)
-        dataframe['parent_sku'] = dataframe['parent_sku'].str.split('-', expand=True)[0]
-        
+        dataframe["SKU"] = dataframe["SKU"].str.upper().str.strip()
+
+        dataframe["parent_sku"] = dataframe["SKU"].str.replace("\(.*\)", "", regex=True)
+        dataframe["parent_sku"] = dataframe["parent_sku"].str.split("-", expand=True)[0]
+
         return dataframe
 
     def create_shopify_export(
@@ -166,38 +195,43 @@ class ShopifyExport:
         
         dim_df = self.create_parent_sku(dim_df)
         raw_df = self.create_parent_sku(raw_df)
-        
-        
-        res1 = pd.merge(raw_df[raw_df['Option1 Value'].eq('SIZE F')].drop(["Option1 Value"], axis=1).rename(columns={'SKU' : 'wholesaler_sku'}),
-                        dim_df,
-                        how="left",
-                        on="parent_sku",
-                        indicator=True).rename(columns={'_merge' : 'source_data'})
-        
-        
-        res2 = pd.merge(raw_df[raw_df['Option1 Value'].ne('SIZE F')].drop(["Option1 Value"],axis=1),
-                        dim_df, how="left",
-                        on=["SKU",'parent_sku'],
-                        indicator=True).rename(columns={'_merge' : 'source_data'})
-         
-        
-        
+
+        res1 = pd.merge(
+            raw_df[raw_df["Option1 Value"].eq("SIZE F")]
+            .drop(["Option1 Value"], axis=1)
+            .rename(columns={"SKU": "wholesaler_sku"}),
+            dim_df,
+            how="left",
+            on="parent_sku",
+            indicator=True,
+        ).rename(columns={"_merge": "source_data"})
+
+        res2 = pd.merge(
+            raw_df[raw_df["Option1 Value"].ne("SIZE F")].drop(
+                ["Option1 Value"], axis=1
+            ),
+            dim_df,
+            how="left",
+            on=["SKU", "parent_sku"],
+            indicator=True,
+        ).rename(columns={"_merge": "source_data"})
+
         # result = pd.merge(
         #     raw_df.drop(["Option1 Value"], axis=1).rename(columns={'SKU' : 'wholesaler_sku'}), dim_df, on=['parent_sku'],
         #     how="left",indicator=True
         # ).rename(columns={'_merge' : 'source_data'})
 
-        result = pd.concat([res1,res2]).reset_index(drop=True)
-        
-        result['source_data'] = np.where(result['source_data'] == 'both', 'both', 'missing')
-        
-        output_columns.append('source_data')
-        
+        result = pd.concat([res1, res2]).reset_index(drop=True)
+
+        result["source_data"] = np.where(
+            result["source_data"] == "both", "both", "missing"
+        )
+
+        output_columns.append("source_data")
+
         result_final = result.assign(
             **{col: pd.NA for col in output_columns if not col in result.columns}
         )[output_columns].sort_values(["SKU"])
-        
-        
 
         return result_final
 
