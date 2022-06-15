@@ -3,6 +3,7 @@ from typing import Optional
 import logging
 from pathlib import Path
 from gspread_pandas import Spread
+from gspread_pandas.conf import get_config
 
 import pandas as pd
 import numpy as np
@@ -15,13 +16,18 @@ formatter = logging.Formatter("%(asctime)s:%(name)s:%(message)s")
 
 if not Path(__file__).parent.parent.joinpath("logs").is_dir():
     Path(__file__).parent.parent.joinpath("logs").mkdir(parents=True)
+    
+    
+p = Path(__file__).parent.parent.parent
+
+c =  get_config(p)
 
 
 @dataclass
 class ShopifyExport:
 
     gsheet_log_sheet_name: str = "Logs"
-    service: Spread = Spread("Shopify Export")
+    service: Spread = Spread("Shopify Export", config=c)
 
     # post init
     def __post_init__(self):
@@ -154,7 +160,7 @@ class ShopifyExport:
 
         dim_df = self.service.sheet_to_df(sheet="Shopify Lookup").reset_index()
 
-        dim_df = dim_df.drop_duplicates(subset=["Handle", "Title"], keep="first")
+        dim_df = dim_df.drop_duplicates(subset=["Handle", "Title", "Option1 Value"], keep="first")
         
         
         
