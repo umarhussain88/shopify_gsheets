@@ -2,58 +2,58 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PosixPath
 from gspread_pandas import Spread
 from gspread_pandas.conf import get_config
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from gspread_pandas import  conf, Spread
+from gspread_pandas import conf, Spread
 
 
-creds = [
-    "type" "project_id",
-    "private_key_id",
-    "private_key",
-    "client_email",
-    "client_id",
-    "auth_uri",
-    "token_uri",
-    "auth_provider_x509_cert_url",
-    "client_x509_cert_url",
-]
 
-cred_dict = {}
-for c in creds:
-    cred_dict[c] = os.environ.get(c)
-
-
-with open('google_secret.json', 'w') as f:
-    json.dump(cred_dict, f)
-
-c = conf.get_config(".", "google_secret.json")
-
-
-p = Path(__file__).parent.parent.joinpath("logs")
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(asctime)s:%(name)s:%(message)s")
-
-if not Path(__file__).parent.parent.joinpath("logs").is_dir():
-    Path(__file__).parent.parent.joinpath("logs").mkdir(parents=True)
     
+def logger_util(name : str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
     
-p = Path(__file__).parent.parent.parent
 
-c =  get_config(p)
+    #create console handler and set level to debug
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
 
+
+    #create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s - %(lineno)d')
+
+    #create file handler 
+    trg_path =  Path(__file__).parent.parent.joinpath('logs')
+    if not trg_path.exists():
+        trg_path.mkdir(parents=True)  
+    #create file handler and set level to warning
+    fh = logging.FileHandler(trg_path.joinpath('app.log'), 'w')
+    fh.setLevel(logging.INFO)
+    
+
+    #add formatter to ch
+    ch.setFormatter(formatter)
+
+    #add ch to logger
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+
+    return logger
+
+logger = logger_util(__name__)
 
 @dataclass
 class ShopifyExport:
 
     gsheet_log_sheet_name: str = "Logs"
+    src_path: PosixPath = Path(__file__).parent.parent.parent
+    c = conf.get_config(src_path)
+    # mutable type default factory
     service: Spread = Spread("Shopify Export", config=c)
 
     # post init
@@ -189,10 +189,10 @@ class ShopifyExport:
 
         dim_df = self.service.sheet_to_df(sheet="Shopify Lookup").reset_index()
 
-        dim_df = dim_df.drop_duplicates(subset=["Handle", "Title", "Option1 Value"], keep="first")
-        
-        
-        
+        dim_df = dim_df.drop_duplicates(
+            subset=["Handle", "Title", "Option1 Value"], keep="first"
+        )
+
         dim_df = self.create_parent_sku(dim_df)
         raw_df = self.create_parent_sku(raw_df)
 
@@ -237,3 +237,5 @@ class ShopifyExport:
 
     def create_missing_output(self, sheet_name: str) -> pd.DataFrame:
         pass
+
+
