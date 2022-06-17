@@ -23,7 +23,6 @@ def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
     ch = logging.StreamHandler()
     ch.setLevel(level)
 
-
     #create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s - %(lineno)d')
 
@@ -45,7 +44,7 @@ def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
 
     return logger
 
-logger = logger_util(__name__)
+logger = logger_util(__name__, level= logging.ERROR)
 
 @dataclass
 class ShopifyExport:
