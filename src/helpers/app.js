@@ -33,3 +33,9 @@ function shopifyExport() {
     }
 
 }
+
+// get cell value from sheet
+function getCell(cell) {
+    var sheet = SpreadsheetApp.getActive().getSheetByName('Control');
+    return sheet.getRange(cell).getValue();
+}

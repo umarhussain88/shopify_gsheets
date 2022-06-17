@@ -14,14 +14,14 @@ from gspread_pandas import conf, Spread
 
 
     
-def logger_util(name : str) -> logging.Logger:
+def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
     
 
     #create console handler and set level to debug
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
+    ch.setLevel(level)
 
 
     #create formatter
@@ -33,7 +33,7 @@ def logger_util(name : str) -> logging.Logger:
         trg_path.mkdir(parents=True)  
     #create file handler and set level to warning
     fh = logging.FileHandler(trg_path.joinpath('app.log'), 'w')
-    fh.setLevel(logging.INFO)
+    fh.setLevel(level)
     
 
     #add formatter to ch
@@ -78,6 +78,19 @@ class ShopifyExport:
 
         end = self.generate_time()
 
+        
+        if self.job_key >= 10:
+            self.service.clear_sheet(sheet=self.gsheet_log_sheet_name)
+            self.job_key = 1
+            headers = True
+            row_increment = 0
+            max_row =  1
+        else:
+            headers = False
+            row_increment = 2
+            max_row = self.service.sheet_to_df(sheet=self.gsheet_log_sheet_name).shape[0]
+            
+            
         # write to log sheet
         log_sheet = pd.DataFrame(
             {
@@ -89,14 +102,13 @@ class ShopifyExport:
         )
 
         # get max row
-        max_row = self.service.sheet_to_df(sheet=self.gsheet_log_sheet_name).shape[0]
-
+        
         self.service.df_to_sheet(
             df=log_sheet,
             sheet="Logs",
-            headers=False,
+            headers=headers,
             index=False,
-            start=f"A{max_row + 2}",
+            start=f"A{max_row + row_increment}",
         )
 
     def transform_raw_export(self, sheet_name: str) -> pd.DataFrame:
@@ -175,7 +187,7 @@ class ShopifyExport:
         dataframe["parent_sku"] = dataframe["SKU"].str.replace("\(.*\)", "", regex=True)
         dataframe["parent_sku"] = dataframe["parent_sku"].str.split("-", expand=True)[0]
 
-        return dataframe
+        return dataframe.copy()
 
     def create_shopify_export(
         self,
@@ -221,19 +233,21 @@ class ShopifyExport:
         #     how="left",indicator=True
         # ).rename(columns={'_merge' : 'source_data'})
 
-        result = pd.concat([res1, res2]).reset_index(drop=True)
+        result = pd.concat([res1, res2]).reset_index(drop=True).copy()
 
         result["source_data"] = np.where(
             result["source_data"] == "both", "both", "missing"
-        )
-
-        output_columns.append("source_data")
+        ).copy()
+        
+        if not 'source_data' in output_columns:
+            output_columns.append("source_data")
+        
 
         result_final = result.assign(
             **{col: pd.NA for col in output_columns if not col in result.columns}
         )[output_columns].sort_values(["SKU"])
 
-        return result_final
+        return result_final.copy()
 
     def create_missing_output(self, sheet_name: str) -> pd.DataFrame:
         pass
