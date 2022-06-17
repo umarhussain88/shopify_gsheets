@@ -37,6 +37,7 @@ def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
 
     #add formatter to ch
     ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
 
     #add ch to logger
     logger.addHandler(ch)

@@ -33,8 +33,8 @@ def main():
     
 
         logger.info("Running... every 8 seconds")
-        timeout = time() + 30 
-        sleep(8)
+        timeout = time() + 45 
+        sleep(15)
         val = gc.open("Shopify Export").get_worksheet_by_id(610921420).get("B2")[0][0]
         logger.info(f"{val} is the value in the spreadsheet")
         if val == "TRUE" or time()  > timeout:
@@ -71,6 +71,7 @@ def main():
             gc.open("Shopify Export").get_worksheet_by_id(610921420).update_acell(
                 "B2", False
             )
+            break
     
 
 
