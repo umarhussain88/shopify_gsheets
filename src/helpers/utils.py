@@ -45,7 +45,7 @@ def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
 
     return logger
 
-logger = logger_util(__name__, level= logging.ERROR)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ShopifyExport:

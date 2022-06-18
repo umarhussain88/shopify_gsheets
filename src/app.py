@@ -25,19 +25,18 @@ def main():
 
     sf = ShopifyExport()
     gc = gspread.service_account(sf.src_path.joinpath("google_secret.json"))
-    
-    
-    while True:
-        
-        
-    
+    timeout = time() + 45
+    logger.info(f'Setting timeout value as {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}')
 
-        logger.info("Running... every 8 seconds")
-        timeout = time() + 45 
+    while True:
+
+        logger.info("Running... every 15 seconds")
+        logger.info(f'current time is {datetime.fromtimestamp(time()).strftime("%H:%M:%S")}')
+        logger.info(f'timeout time is {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}')
         sleep(15)
         val = gc.open("Shopify Export").get_worksheet_by_id(610921420).get("B2")[0][0]
         logger.info(f"{val} is the value in the spreadsheet")
-        if val == "TRUE" or time()  > timeout:
+        if val == "TRUE":
             logger.info(f"{val} is the value in the spreadsheet running script")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             sf.post_log("Started app", start_time=now)
@@ -72,7 +71,9 @@ def main():
                 "B2", False
             )
             break
-    
+        elif time() > timeout:
+            logger.info("Time out, exiting.")
+            break
 
 
 if __name__ == "__main__":
