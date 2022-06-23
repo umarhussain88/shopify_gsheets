@@ -25,7 +25,7 @@ def main():
 
     sf = ShopifyExport()
     gc = gspread.service_account(sf.src_path.joinpath("google_secret.json"))
-    timeout = time() + 45
+    timeout = time() + 90 
     logger.info(f'Setting timeout value as {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}')
 
     while True:
