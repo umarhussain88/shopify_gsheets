@@ -70,12 +70,3 @@ and add the following command
 `*/2 * * * * /home/{your user}/shopify_gsheets/run.sh`
 
 This will now periodically run every two minutes and run and pending jobs.
-
-
-
-
-
-
-
-
-

@@ -25,23 +25,33 @@ def main():
 
     sf = ShopifyExport()
     gc = gspread.service_account(sf.src_path.joinpath("google_secret.json"))
-    timeout = time() + 90 
-    logger.info(f'Setting timeout value as {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}')
+    timeout = time() + 90
+    logger.info(
+        f'Setting timeout value as {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}'
+    )
 
     while True:
 
         logger.info("Running... every 15 seconds")
-        logger.info(f'current time is {datetime.fromtimestamp(time()).strftime("%H:%M:%S")}')
-        logger.info(f'timeout time is {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}')
+        logger.info(
+            f'current time is {datetime.fromtimestamp(time()).strftime("%H:%M:%S")}'
+        )
+        logger.info(
+            f'timeout time is {datetime.fromtimestamp(timeout).strftime("%H:%M:%S")}'
+        )
         sleep(15)
         val = gc.open("Shopify Export").get_worksheet_by_id(610921420).get("B2")[0][0]
         logger.info(f"{val} is the value in the spreadsheet")
+        val = "TRUE"  # debug only
         if val == "TRUE":
+
             logger.info(f"{val} is the value in the spreadsheet running script")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             sf.post_log("Started app", start_time=now)
+
             raw_df = None
             raw_df = sf.transform_raw_export("Wholesaler Data")
+
             missing_df = None
             missing_df = sf.create_shopify_export(
                 raw_df=raw_df, output_columns=output_columns
@@ -49,6 +59,7 @@ def main():
             missing_df["wholesaler_sku"] = missing_df["wholesaler_sku"].fillna(
                 missing_df["SKU"]
             )
+
             sf.service.clear_sheet(sheet="Output", rows=10000, cols=9)
             sf.service.df_to_sheet(
                 sheet="Output",
@@ -57,14 +68,19 @@ def main():
                 ),
                 index=False,
             )
-            sf.service.clear_sheet(sheet="Missing SKUs", rows=3000, cols=3)
+
+            final_missing_df = sf.create_missing_output(
+                output_missing_df=missing_df
+            )
+
+            sf.service.clear_sheet(sheet="Missing SKUs", rows=3000, cols=5)
+
             sf.service.df_to_sheet(
                 sheet="Missing SKUs",
-                df=missing_df[missing_df["source_data"].eq("missing")][
-                    ["parent_sku", "wholesaler_sku", "70 rue de la prulay"]
-                ],
+                df=final_missing_df,
                 index=False,
             )
+
             sf.post_log("Finished app", start_time=now)
             logger.info("Changing control value to false.")
             gc.open("Shopify Export").get_worksheet_by_id(610921420).update_acell(

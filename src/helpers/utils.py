@@ -12,40 +12,40 @@ import pandas as pd
 from gspread_pandas import conf, Spread
 
 
-
-    
-def logger_util(name : str, level : int = logging.INFO ) -> logging.Logger:
+def logger_util(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    
 
-    #create console handler and set level to debug
+    # create console handler and set level to debug
     ch = logging.StreamHandler()
     ch.setLevel(level)
 
-    #create formatter
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s - %(lineno)d')
+    # create formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(filename)s - %(lineno)d"
+    )
 
-    #create file handler 
-    trg_path =  Path(__file__).parent.parent.joinpath('logs')
+    # create file handler
+    trg_path = Path(__file__).parent.parent.joinpath("logs")
     if not trg_path.exists():
-        trg_path.mkdir(parents=True)  
-    #create file handler and set level to warning
-    fh = logging.FileHandler(trg_path.joinpath('app.log'), 'w')
+        trg_path.mkdir(parents=True)
+    # create file handler and set level to warning
+    fh = logging.FileHandler(trg_path.joinpath("app.log"), "w")
     fh.setLevel(level)
-    
 
-    #add formatter to ch
+    # add formatter to ch
     ch.setFormatter(formatter)
     fh.setFormatter(formatter)
 
-    #add ch to logger
+    # add ch to logger
     logger.addHandler(ch)
     logger.addHandler(fh)
 
     return logger
 
+
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ShopifyExport:
@@ -78,19 +78,19 @@ class ShopifyExport:
 
         end = self.generate_time()
 
-        
         if self.job_key >= 10:
             self.service.clear_sheet(sheet=self.gsheet_log_sheet_name)
             self.job_key = 1
             headers = True
             row_increment = 0
-            max_row =  1
+            max_row = 1
         else:
             headers = False
             row_increment = 2
-            max_row = self.service.sheet_to_df(sheet=self.gsheet_log_sheet_name).shape[0]
-            
-            
+            max_row = self.service.sheet_to_df(sheet=self.gsheet_log_sheet_name).shape[
+                0
+            ]
+
         # write to log sheet
         log_sheet = pd.DataFrame(
             {
@@ -102,7 +102,7 @@ class ShopifyExport:
         )
 
         # get max row
-        
+
         self.service.df_to_sheet(
             df=log_sheet,
             sheet="Logs",
@@ -112,19 +112,31 @@ class ShopifyExport:
         )
 
     def transform_raw_export(self, sheet_name: str) -> pd.DataFrame:
-        """
-        Transform raw export to a dataframe.
-        """
+        """Transforms the Wholesaler Data into a shopify ready export
+           requires a a shopify lookup table.
 
+           there are two distinct categories to be extracted, accessories which only have a single size
+
+           these are found by having a value in size F
+           the items without a value in the size F field are considered regular items with variable sizes.
+
+           items with no values in the row are considered to be 0 and need to be added to the output.
+
+        Args:
+            sheet_name (str): requires the raw sheet name.
+
+        Returns:
+            pd.DataFrame: a dataframe ready to input into the output table.
+        """
         # open sheet
         df = (
             self.service.sheet_to_df(sheet=sheet_name).reset_index().replace("", np.nan)
-        )
+        ).fillna(0)
         # log start
         start_time = self.generate_time()
         self.post_log(f"Started transform_raw_export for {sheet_name}", start_time)
 
-        df1 = df[df["SIZE F"].isnull()]
+        df1 = df[df["SIZE F"].eq(0)]
 
         accessories = (
             df.dropna(subset=["SIZE F"])
@@ -184,15 +196,19 @@ class ShopifyExport:
         """
         dataframe["SKU"] = dataframe["SKU"].str.upper().str.strip()
 
-        dataframe["parent_sku"] = dataframe["SKU"].str.replace("\(.*\)", "", regex=True)
-        dataframe["parent_sku"] = dataframe["parent_sku"].str.split("-", expand=True)[0]
+        dataframe.loc[:, "parent_sku"] = dataframe["SKU"].str.replace(
+            "\(.*\)", "", regex=True
+        )
+        dataframe.loc[:, "parent_sku"] = dataframe["parent_sku"].str.split(
+            "-", expand=True
+        )[0]
 
         return dataframe.copy()
 
     def create_shopify_export(
         self,
         raw_df: pd.DataFrame,
-        output_columns: list,
+        output_columns: list,  # this is bad, passing a mutable object into a function.
     ) -> pd.DataFrame:
 
         # log start
@@ -238,10 +254,9 @@ class ShopifyExport:
         result["source_data"] = np.where(
             result["source_data"] == "both", "both", "missing"
         ).copy()
-        
-        if not 'source_data' in output_columns:
+
+        if not "source_data" in output_columns:
             output_columns.append("source_data")
-        
 
         result_final = result.assign(
             **{col: pd.NA for col in output_columns if not col in result.columns}
@@ -249,7 +264,35 @@ class ShopifyExport:
 
         return result_final.copy()
 
-    def create_missing_output(self, sheet_name: str) -> pd.DataFrame:
-        pass
+    def create_missing_output(
+        self, output_missing_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """generates the missing SKU items and non existant SKU items vis a vis the
+        the shopify lookup table.
+
+        missing size = exists in lookup table but the size vairant is not found
+        missing sku = there is no match whatsoever in the lookup table
 
 
+
+        Args:
+            output_missing_df (pd.DataFrame): missing_df which is generated from the shopify output
+            raw_dataframe (pd.DataFrame): which will contain the SKUs of non existant items.
+
+        Returns:
+            pd.DataFrame: final missing_dataframe with types.
+        """
+
+        # too much effort to refactor this - essentially the merge will give you values for handle - at a parent_sku level
+        # we can use this to infer whether or not a sku exists on the lookup for not.
+        output_missing_df["missing_type"] = np.where(
+            output_missing_df.groupby("parent_sku")["Handle"].ffill().isnull(),
+            "SKU",
+            "SIZE",
+        )
+
+        mdf = output_missing_df[
+            ["parent_sku", "wholesaler_sku", "70 rue de la prulay", "SKU", "missing_type","source_data"]
+        ].dropna(subset=['SKU']).copy()
+
+        return mdf[mdf['source_data'].eq('missing')].drop('source_data',axis=1)
