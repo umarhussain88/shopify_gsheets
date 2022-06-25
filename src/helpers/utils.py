@@ -228,7 +228,7 @@ class ShopifyExport:
             raw_df[raw_df["Option1 Value"].eq("SIZE F")]
             .drop(["Option1 Value"], axis=1)
             .rename(columns={"SKU": "wholesaler_sku"}),
-            dim_df,
+            dim_df.drop_duplicates(subset=['parent_sku'],keep='first'),
             how="left",
             on="parent_sku",
             indicator=True,
@@ -261,6 +261,10 @@ class ShopifyExport:
         result_final = result.assign(
             **{col: pd.NA for col in output_columns if not col in result.columns}
         )[output_columns].sort_values(["SKU"])
+        
+        result_final = result_final.reset_index(drop=True)
+        result_final['70 rue de la prulay'] = result_final['70 rue de la prulay'].astype(int)
+        result_final = result_final.sort_values('70 rue de la prulay').drop_duplicates(subset=['SKU'],keep='last')
 
         return result_final.copy()
 
@@ -295,4 +299,4 @@ class ShopifyExport:
             ["parent_sku", "wholesaler_sku", "70 rue de la prulay", "SKU", "missing_type","source_data"]
         ].dropna(subset=['SKU']).copy()
 
-        return mdf[mdf['source_data'].eq('missing')].drop('source_data',axis=1)
+        return mdf[mdf['source_data'].eq('missing') & mdf["70 rue de la prulay"].gt(0)].drop('source_data',axis=1)
