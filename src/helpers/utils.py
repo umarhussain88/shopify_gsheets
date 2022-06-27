@@ -290,7 +290,7 @@ class ShopifyExport:
         # too much effort to refactor this - essentially the merge will give you values for handle - at a parent_sku level
         # we can use this to infer whether or not a sku exists on the lookup for not.
         output_missing_df["missing_type"] = np.where(
-            output_missing_df.groupby("parent_sku")["Handle"].ffill().isnull(),
+            output_missing_df.groupby("parent_sku")["Handle"].ffill().bfill().isnull(),
             "SKU",
             "SIZE",
         )
