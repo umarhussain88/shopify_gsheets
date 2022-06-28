@@ -77,7 +77,7 @@ def main():
 
             sf.service.df_to_sheet(
                 sheet="Missing SKUs",
-                df=final_missing_df,
+                df=final_missing_df.sort_values('parent_sku',ascending=True),
                 index=False,
             )
 
