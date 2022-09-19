@@ -263,7 +263,7 @@ class ShopifyExport:
         )[output_columns].sort_values(["SKU"])
         
         result_final = result_final.reset_index(drop=True)
-        result_final['70 rue de la prulay'] = result_final['70 rue de la prulay'].astype(int)
+        result_final['70 rue de la prulay'] = pd.to_numeric(result_final['70 rue de la prulay'], errors='coerce')
         result_final = result_final.sort_values('70 rue de la prulay').drop_duplicates(subset=['SKU'],keep='last')
 
         return result_final.copy()
